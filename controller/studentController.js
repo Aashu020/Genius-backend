@@ -52,7 +52,6 @@ const bulkUploadStudentData = async (req, res) => {
 
 
 // Add a new student
-
 const addStudent = async (req, res) => {
     console.log(req.body);
     const month = moment().format('MM');
@@ -63,28 +62,35 @@ const addStudent = async (req, res) => {
     try {
         // Generate unique StudentId
         let counter = await Counter.findOne({ Title: `STU-${year}-${month}` });
+
         if (!counter) {
             counter = new Counter({ Title: `STU-${year}-${month}`, Count: 1 });
         } else {
             counter.Count += 1;
         }
+
         id = `STU${year}${month}${counter.Count.toString().padStart(4, '0')}`;
 
         // Handle Sibling Logic
         if (req.body.SiblingStatus) {
-            const sibData = await SiblingModel.findOne({ ExistingStudentId: req.body.SibId });
+            const sibData = await SiblingModel.findOne({ ExistingStudentId: req.body.SibId }); // Use req.body.SibId
+
             if (sibData) {
+                // If sibling data exists, push the new student to the existing sibling array
                 sibData.Sibling.push({
                     StudentId: id,
                     StudentName: req.body.StudentName
                 });
+
                 sibDataToSave = {
                     Id: sibData.SiblingId,
                     Status: true
                 };
-                await sibData.save();
+
+                await sibData.save(); // Save the updated sibling data
             } else {
                 let counter = await Counter.findOne({ Title: `SIB-${year}-${month}` });
+
                 if (!counter) {
                     counter = new Counter({ Title: `SIB-${year}-${month}`, Count: 1 });
                 } else {
@@ -99,8 +105,8 @@ const addStudent = async (req, res) => {
 
                 const sibling = new SiblingModel({
                     SiblingId: siblingId,
-                    StudentId: req.body.SibId,
-                    StudentName: req.body.SibName,
+                    StudentId: req.body.SibId, // Adjust as necessary
+                    StudentName: req.body.SibName, // Adjust as necessary
                     Sibling: [{
                         StudentId: id,
                         StudentName: req.body.StudentName
@@ -131,8 +137,8 @@ const addStudent = async (req, res) => {
             Weight: req.body.Weight,
             AadharNumber: req.body.AadharNumber,
             MobileNo: req.body.MobileNo,
-            Medium: req.body.Medium,
             Email: req.body.Email,
+            Medium:req.body.Medium,
             House: req.body.House,
             Address: req.body.Address,
             City: req.body.City,
@@ -161,9 +167,9 @@ const addStudent = async (req, res) => {
             SiblingStatus: req.body.SiblingStatus,
             Sibling: sibDataToSave,
             Subject: req.body.Subject,
-            FatherDetail: req.body.FatherDetail, // No JSON.parse()
-            MotherDetails: req.body.MotherDetails, // No JSON.parse()
-            EmergencyContact: req.body.EmergencyContact, // No JSON.parse()
+            FatherDetail: JSON.parse(req.body.FatherDetail),
+            MotherDetails: JSON.parse(req.body.MotherDetails),
+            EmergencyContact: JSON.parse(req.body.EmergencyContact),
             Document: {
                 StudentPhoto: req.files?.StudentPhoto ? req.files.StudentPhoto[0].filename : null,
                 Birth: req.files?.Birth ? req.files.Birth[0].filename : null,
@@ -181,8 +187,10 @@ const addStudent = async (req, res) => {
         await counter.save();
         await newStudent.save();
 
-        // Fee Creation logic
+        // Now create fee data
         const { AdmissionInClass } = req.body;
+
+        // Fee Creation logic
         const academicYear = await AcademicYearInfo.findOne({ Status: "Active" });
         if (!academicYear) {
             return res.status(400).json({ message: "Active Academic Year not found" });
@@ -196,20 +204,25 @@ const addStudent = async (req, res) => {
                 return res.status(400).json({ message: "Fee Slab for the Class is missing" });
             }
 
-            var temp = feeSlab.Fees.find(val => val.Name.trim().toLowerCase() === "tuition fee");
-            var totalTuFee = temp?.Times * temp?.Amount;
-            var discountedFee = totalTuFee * (Number(req.body.FeeDiscount || 0) / 100);
+            var temp = feeSlab.Fees.find(val => val.Name.trim().toLowerCase() === "tuition fee")
+
+            var totalTuFee = temp?.Times * temp?.Amount
+
+            // var finalTuFee = totalTuFee - (totalTuFee * (Number(req.body.FeeDiscount) / 100));
+
+            // console.log(finalTuFee);
 
             feeData = new FeeData({
                 FeeID: feeId,
                 StudentId: id,
                 Payments: [],
-                RemainingFee: feeSlab.TotalFee - discountedFee,
-                TotalFee: feeSlab.TotalFee - discountedFee,
+                RemainingFee: feeSlab.TotalFee - (totalTuFee * (Number(req.body.FeeDiscount) / 100)),
+                TotalFee: feeSlab.TotalFee - (totalTuFee * (Number(req.body.FeeDiscount) / 100)),
                 Balance: 0,
             });
 
-            console.log(feeData);
+            console.log(feeData)
+
             await feeData.save();
         }
 

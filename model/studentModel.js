@@ -44,7 +44,8 @@ const studentModel = new mongoose.Schema({
         type: String
     },
     Medium:{
-        type:String
+        type:String,
+        required:true,
     },
     Email: {
         type: String
